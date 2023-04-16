@@ -30,7 +30,7 @@ parser.add_argument(
     help="list of files to check, all files if unspecified",
     nargs='*')
 
-rootdir = os.path.dirname(__file__) + "/../../"
+rootdir = f"{os.path.dirname(__file__)}/../../"
 rootdir = os.path.abspath(rootdir)
 parser.add_argument(
     "--rootdir", default=rootdir, help="root directory to examine")
@@ -55,9 +55,8 @@ def get_refs():
     for path in glob.glob(os.path.join(args.boilerplate_dir, "boilerplate.*.txt")):
         extension = os.path.basename(path).split(".")[1]
 
-        ref_file = open(path, 'r')
-        ref = ref_file.read().splitlines()
-        ref_file.close()
+        with open(path, 'r') as ref_file:
+            ref = ref_file.read().splitlines()
         refs[extension] = ref
 
     return refs
@@ -76,7 +75,7 @@ def file_passes(filename, refs, regexs):
     try:
         f = open(filename, 'r')
     except Exception as exc:
-        print("Unable to open %s: %s" % (filename, exc), file=verbose_out)
+        print(f"Unable to open {filename}: {exc}", file=verbose_out)
         return False
 
     data = f.read()
@@ -93,13 +92,9 @@ def file_passes(filename, refs, regexs):
         elif extension == "bzl":
             extension = "generatebzl"
 
-    if extension != "":
-        ref = refs[extension]
-    else:
-        ref = refs[basename]
-
+    ref = refs[extension] if extension != "" else refs[basename]
     # remove extra content from the top of files
-    if extension == "go" or extension == "generatego":
+    if extension in ["go", "generatego"]:
         p = regexs["go_build_constraints"]
         (data, found) = p.subn("", data, 1)
     elif extension in ["sh", "py"]:
@@ -122,11 +117,15 @@ def file_passes(filename, refs, regexs):
     for d in data:
         if p.search(d):
             if generated:
-                print('File %s has the YEAR field, but it should not be in generated file' %
-                      filename, file=verbose_out)
+                print(
+                    f'File {filename} has the YEAR field, but it should not be in generated file',
+                    file=verbose_out,
+                )
             else:
-                print('File %s has the YEAR field, but missing the year of date' %
-                      filename, file=verbose_out)
+                print(
+                    f'File {filename} has the YEAR field, but missing the year of date',
+                    file=verbose_out,
+                )
             return False
 
     if not generated:
@@ -139,8 +138,10 @@ def file_passes(filename, refs, regexs):
 
     # if we don't match the reference at this point, fail
     if ref != data:
-        print("Header in %s does not match reference, diff:" %
-              filename, file=verbose_out)
+        print(
+            f"Header in {filename} does not match reference, diff:",
+            file=verbose_out,
+        )
         if args.verbose:
             print(file=verbose_out)
             for line in difflib.unified_diff(ref, data, 'reference', filename, lineterm=''):
@@ -165,11 +166,11 @@ skipped_ungenerated_files = [
 
 
 def normalize_files(files):
-    newfiles = []
-    for pathname in files:
-        if any(x in pathname for x in skipped_dirs):
-            continue
-        newfiles.append(pathname)
+    newfiles = [
+        pathname
+        for pathname in files
+        if all(x not in pathname for x in skipped_dirs)
+    ]
     for i, pathname in enumerate(newfiles):
         if not os.path.isabs(pathname):
             newfiles[i] = os.path.join(args.rootdir, pathname)
@@ -206,13 +207,11 @@ def get_files(extensions):
 
 def get_dates():
     years = datetime.datetime.now().year
-    return '(%s)' % '|'.join((str(year) for year in range(2014, years+1)))
+    return f"({'|'.join(str(year) for year in range(2014, years + 1))})"
 
 
 def get_regexs():
-    regexs = {}
-    # Search for "YEAR" which exists in the boilerplate, but shouldn't in the real thing
-    regexs["year"] = re.compile('YEAR')
+    regexs = {"year": re.compile('YEAR')}
     # get_dates return 2014, 2015, 2016, 2017, or 2018 until the current year as a regex like: "(2014|2015|2016|2017|2018)";
     # company holder names can be anything
     regexs["date"] = re.compile(get_dates())
