@@ -37,7 +37,7 @@ class MatchHandler(object):
 def short_replace(match, file, line_number):
     """Replace a Short: ... cobra command description with an internationalization
     """
-    sys.stdout.write('{}i18n.T({}),\n'.format(match.group(1), match.group(2)))
+    sys.stdout.write(f'{match.group(1)}i18n.T({match.group(2)}),\n')
 
 SHORT_MATCH = MatchHandler(r'(\s+Short:\s+)("[^"]+"),', short_replace)
 
@@ -46,7 +46,7 @@ def import_replace(match, file, line_number):
     Doesn't try to be smart and detect if it's already present, assumes a
     gofmt round wil fix things.
     """
-    sys.stdout.write('{}\n"k8s.io/kubectl/pkg/util/i18n"\n'.format(match.group(1)))
+    sys.stdout.write(f'{match.group(1)}\n"k8s.io/kubectl/pkg/util/i18n"\n')
 
 IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubectl/pkg/cmd/util")', import_replace)
 
@@ -54,13 +54,13 @@ IMPORT_MATCH = MatchHandler('(.*"k8s.io/kubectl/pkg/cmd/util")', import_replace)
 def string_flag_replace(match, file, line_number):
     """Replace a cmd.Flags().String("...", "", "...") with an internationalization
     """
-    sys.stdout.write('{}i18n.T("{})"))\n'.format(match.group(1), match.group(2)))
+    sys.stdout.write(f'{match.group(1)}i18n.T("{match.group(2)})"))\n')
 
 STRING_FLAG_MATCH = MatchHandler('(\s+cmd\.Flags\(\).String\("[^"]*", "[^"]*", )"([^"]*)"\)', string_flag_replace)
 
 
 def long_string_replace(match, file, line_number):
-    return '{}i18n.T({}){}'.format(match.group(1), match.group(2), match.group(3))
+    return f'{match.group(1)}i18n.T({match.group(2)}){match.group(3)}'
 
 LONG_DESC_MATCH = MatchHandler('(LongDesc\()(`[^`]+`)([^\n]\n)', long_string_replace)
 
@@ -70,14 +70,10 @@ def replace(filename, matchers, multiline_matchers):
     """Given a file and a set of matchers, run those matchers
     across the file and replace it with the results.
     """
-    # Run all the matchers
-    line_number = 0
-    for line in fileinput.input(filename, inplace=True):
-        line_number += 1
+    for line_number, line in enumerate(fileinput.input(filename, inplace=True), start=1):
         matched = False
         for matcher in matchers:
-            match = matcher.regex.match(line)
-            if match:
+            if match := matcher.regex.match(line):
                 matcher.replace_fn(match, filename, line_number)
                 matched = True
                 break
@@ -87,15 +83,13 @@ def replace(filename, matchers, multiline_matchers):
     with open(filename, 'r') as datafile:
         content = datafile.read()
         for matcher in multiline_matchers:
-            match = matcher.regex.search(content)
-            while match:
+            while match := matcher.regex.search(content):
                 rep = matcher.replace_fn(match, filename, 0)
                 # Escape back references in the replacement string
                 # (And escape for Python)
                 # (And escape for regex)
                 rep = re.sub('\\\\(\\d)', '\\\\\\\\\\1', rep)
                 content = matcher.regex.sub(rep, content, 1)
-                match = matcher.regex.search(content)
         sys.stdout.write(content)
 
     # gofmt the file again

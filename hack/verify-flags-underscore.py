@@ -79,10 +79,8 @@ def get_all_files(rootdir):
 def check_underscore_in_flags(rootdir, files):
     # preload the 'known' flags which don't follow the - standard
     pathname = os.path.join(rootdir, "hack/verify-flags/excluded-flags.txt")
-    f = open(pathname, 'r')
-    excluded_flags = set(f.read().splitlines())
-    f.close()
-
+    with open(pathname, 'r') as f:
+        excluded_flags = set(f.read().splitlines())
     regexs = [ re.compile('Var[P]?\([^,]*, "([^"]*)"'),
                re.compile('.String[P]?\("([^"]*)",[^,]+,[^)]+\)'),
                re.compile('.Int[P]?\("([^"]*)",[^,]+,[^)]+\)'),
@@ -95,9 +93,8 @@ def check_underscore_in_flags(rootdir, files):
     for pathname in files:
         if not pathname.endswith(".go"):
             continue
-        f = open(pathname, 'r')
-        data = f.read()
-        f.close()
+        with open(pathname, 'r') as f:
+            data = f.read()
         matches = []
         for regex in regexs:
             matches = matches + regex.findall(data)
@@ -106,23 +103,18 @@ def check_underscore_in_flags(rootdir, files):
                 continue
             if "_" in flag:
                 new_excluded_flags.add(flag)
-    if len(new_excluded_flags) != 0:
+    if new_excluded_flags:
         print("Found a flag declared with an _ but which is not explicitly listed as a valid flag name in hack/verify-flags/excluded-flags.txt")
         print("Are you certain this flag should not have been declared with an - instead?")
-        l = list(new_excluded_flags)
-        l.sort()
+        l = sorted(new_excluded_flags)
         print("%s" % "\n".join(l))
         sys.exit(1)
 
 def main():
-    rootdir = os.path.dirname(__file__) + "/../"
+    rootdir = f"{os.path.dirname(__file__)}/../"
     rootdir = os.path.abspath(rootdir)
 
-    if len(args.filenames) > 0:
-        files = args.filenames
-    else:
-        files = get_all_files(rootdir)
-
+    files = args.filenames if len(args.filenames) > 0 else get_all_files(rootdir)
     check_underscore_in_flags(rootdir, files)
 
 if __name__ == "__main__":
